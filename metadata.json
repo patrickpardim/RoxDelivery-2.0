@@ -1,0 +1,5 @@
+{
+  "name": "Rox Delivery 2.0",
+  "description": "A functional delivery management app with digital menu and WhatsApp ordering, featuring Supabase integration.",
+  "requestFramePermissions": []
+}
