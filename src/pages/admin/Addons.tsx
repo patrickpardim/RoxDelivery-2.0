@@ -67,7 +67,7 @@ export default function Addons() {
 
   // Forms
   const categoryForm = useForm<z.infer<typeof categorySchema>>({
-    resolver: zodResolver(categorySchema),
+    resolver: zodResolver(categorySchema) as any,
     defaultValues: {
       is_mandatory: false,
       min_quantity: 0,
@@ -378,7 +378,7 @@ export default function Addons() {
               <CardTitle>{editingCategory ? 'Editar Categoria' : 'Nova Categoria'}</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={categoryForm.handleSubmit(onCategorySubmit)} className="space-y-6">
+              <form onSubmit={categoryForm.handleSubmit(onCategorySubmit as any)} className="space-y-6">
                 <Input 
                   label="Nome da Categoria" 
                   placeholder="Ex: Frutas, Molhos..."
@@ -474,11 +474,11 @@ export default function Addons() {
   );
 }
 
-function AddonRow({ addon, onUpdate, onDelete }: { 
+const AddonRow: React.FC<{ 
   addon: Addon, 
   onUpdate: (addon: Addon, updates: Partial<Addon>) => void,
   onDelete: (id: string) => void 
-}) {
+}> = ({ addon, onUpdate, onDelete }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(addon.name);
   const [price, setPrice] = useState(addon.price.toString());
@@ -551,7 +551,7 @@ function AddonRow({ addon, onUpdate, onDelete }: {
   );
 }
 
-function NewAddonRow({ categoryId, onAdd }: { categoryId: string, onAdd: (catId: string, name: string, price: string, maxQty: string) => void }) {
+const NewAddonRow = ({ categoryId, onAdd }: { categoryId: string, onAdd: (catId: string, name: string, price: string, maxQty: string) => void }) => {
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [maxQty, setMaxQty] = useState('1');

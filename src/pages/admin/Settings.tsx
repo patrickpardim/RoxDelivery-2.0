@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import React, { useEffect, useState } from 'react';
+import { useForm, useFieldArray, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ const settingsSchema = z.object({
   address_state: z.string().min(2, 'Estado obrigatório'),
   address_complement: z.string().optional(),
   payment_methods: z.array(z.string()).min(1, 'Selecione pelo menos uma forma de pagamento'),
-  opening_hours: z.record(z.array(timeSlotSchema)),
+  opening_hours: z.record(z.string(), z.array(timeSlotSchema)),
 });
 
 type SettingsForm = z.infer<typeof settingsSchema>;
@@ -53,7 +53,7 @@ export default function Settings() {
     control,
     formState: { errors },
   } = useForm<SettingsForm>({
-    resolver: zodResolver(settingsSchema),
+    resolver: zodResolver(settingsSchema) as any,
     defaultValues: {
       restaurant_name: '',
       delivery_fee: 0,
@@ -79,7 +79,7 @@ export default function Settings() {
     },
   });
 
-  const openingHours = watch('opening_hours');
+  const openingHours = (watch('opening_hours') || {}) as Record<string, { open: string; close: string; }[]>;
 
   useEffect(() => {
     async function loadSettings() {
@@ -145,7 +145,7 @@ export default function Settings() {
     }
   };
 
-  const onSubmit = async (data: SettingsForm) => {
+  const onSubmit: SubmitHandler<SettingsForm> = async (data) => {
     if (!user) return;
     setSaving(true);
 
@@ -212,17 +212,9 @@ export default function Settings() {
     <div className="p-6 max-w-4xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Configurações do Restaurante</h1>
-        <button
-          onClick={handleSubmit(onSubmit)}
-          disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Salvar Alterações
-        </button>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-8">
         {/* Basic Info */}
         <section className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold mb-4">Informações Básicas</h2>
@@ -458,6 +450,17 @@ export default function Settings() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-bold text-lg shadow-sm transition-all"
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              Salvar Alterações
+            </button>
           </div>
         </section>
       </form>

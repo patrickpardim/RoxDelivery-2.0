@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { toast } from 'sonner';
-import { ChefHat } from 'lucide-react';
+import { ChefHat, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -20,6 +20,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -30,7 +31,7 @@ export default function LoginPage() {
     try {
       // Check for specific credentials in demo mode or general login
       if (!isSupabaseConfigured) {
-        if (data.email !== 'acaicachoeiro@gmail.com' || data.password !== 'CachoeiroAçaí@2026') {
+        if (data.email !== 'acaicachoeiro@gmail.com' || data.password !== 'Admin@2026') {
            throw new Error('Credenciais inválidas');
         }
       }
@@ -81,10 +82,23 @@ export default function LoginPage() {
               />
               <Input
                 label="Senha"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••"
                 {...register('password')}
                 error={errors.password?.message}
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="focus:outline-none hover:text-purple-600 transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                }
               />
               <Button type="submit" className="w-full" isLoading={isLoading}>
                 Entrar

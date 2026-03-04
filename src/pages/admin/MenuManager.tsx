@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Plus, Pencil, Trash2, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Image as ImageIcon, Loader2, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -234,55 +234,83 @@ export default function MenuManager() {
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-2">
                 {products.filter(p => p.category_id === category.id).map(product => (
-                  <Card key={product.id} className={`overflow-hidden group transition-opacity ${!product.is_active ? 'opacity-75' : ''}`}>
-                    <div className="aspect-video w-full bg-zinc-100 relative">
-                      {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-400">
-                          <ImageIcon className="h-8 w-8" />
-                        </div>
-                      )}
+                  <div 
+                    key={product.id} 
+                    className={`group flex items-center p-3 bg-white border border-zinc-200 rounded-lg hover:border-purple-200 hover:shadow-sm transition-all ${!product.is_active ? 'opacity-60 bg-zinc-50' : ''}`}
+                  >
+                    {/* Left Side: Drag, Image, Info */}
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="cursor-move text-zinc-300 hover:text-zinc-500 shrink-0">
+                        <GripVertical className="h-5 w-5" />
+                      </div>
                       
-                      {/* Actions Overlay - Always visible or on hover based on preference, using absolute positioning */}
-                      <div className="absolute top-2 right-2 flex items-center gap-2">
+                      <div className="h-12 w-12 rounded-lg bg-zinc-100 shrink-0 overflow-hidden border border-zinc-100">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-zinc-300">
+                            <ImageIcon className="h-5 w-5" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0 pr-4">
+                        <h4 className="font-medium text-zinc-900 truncate" title={product.name}>{product.name}</h4>
+                        <p className="text-sm text-zinc-500 truncate" title={product.description}>{product.description || 'Sem descrição'}</p>
+                      </div>
+                    </div>
+
+                    {/* Right Side: Price, Actions */}
+                    <div className="flex items-center gap-6 shrink-0">
+                      <div className="text-right">
+                        <span className="font-semibold text-zinc-900">{formatCurrency(product.price)}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={(e) => { e.stopPropagation(); openProductModal(product); }}
-                          className="h-8 w-8 bg-white rounded-full shadow-sm flex items-center justify-center text-zinc-600 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+                          onClick={() => toggleProductStatus(product)}
+                          className={`p-2 rounded-lg transition-colors ${
+                            product.is_active 
+                              ? 'text-purple-600 hover:bg-purple-50' 
+                              : 'text-zinc-400 hover:bg-zinc-100'
+                          }`}
+                          title={product.is_active ? 'Ocultar do cardápio' : 'Mostrar no cardápio'}
+                        >
+                          {product.is_active ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                        </button>
+                        
+                        <div className="w-px h-4 bg-zinc-200 mx-1" />
+
+                        <button
+                          onClick={() => {
+                            setEditingProduct(product);
+                            productForm.reset({
+                              name: product.name,
+                              description: product.description || '',
+                              price: product.price.toString(),
+                              category_id: product.category_id,
+                              image_url: product.image_url || ''
+                            });
+                            setIsProductModalOpen(true);
+                          }}
+                          className="p-2 text-zinc-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                           title="Editar"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
+                        
                         <button
-                          onClick={(e) => { e.stopPropagation(); deleteProduct(product.id); }}
-                          className="h-8 w-8 bg-white rounded-full shadow-sm flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors"
+                          onClick={() => deleteProduct(product.id)}
+                          className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           title="Excluir"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleProductStatus(product); }}
-                          className={`h-8 px-3 rounded-full shadow-sm flex items-center justify-center text-xs font-semibold transition-colors ${
-                            product.is_active 
-                              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                              : 'bg-zinc-200 text-zinc-600 hover:bg-zinc-300'
-                          }`}
-                          title={product.is_active ? 'Desativar' : 'Ativar'}
-                        >
-                          {product.is_active ? 'Ativo' : 'Inativo'}
-                        </button>
                       </div>
                     </div>
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium truncate">{product.name}</h4>
-                        <span className="font-semibold text-purple-600">{formatCurrency(product.price)}</span>
-                      </div>
-                      <p className="text-sm text-zinc-500 line-clamp-2">{product.description}</p>
-                    </CardContent>
-                  </Card>
+                  </div>
                 ))}
                 
                 <button 
@@ -291,10 +319,10 @@ export default function MenuManager() {
                     productForm.reset({ category_id: category.id });
                     setIsProductModalOpen(true);
                   }}
-                  className="flex flex-col items-center justify-center h-full min-h-[200px] border-2 border-dashed border-zinc-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-colors text-zinc-400 hover:text-purple-600"
+                  className="w-full flex items-center justify-center gap-2 p-3 border border-dashed border-zinc-300 rounded-lg text-zinc-500 hover:text-purple-600 hover:border-purple-300 hover:bg-purple-50 transition-all text-sm font-medium"
                 >
-                  <Plus className="h-8 w-8 mb-2" />
-                  <span className="font-medium">Adicionar Produto</span>
+                  <Plus className="h-4 w-4" />
+                  Adicionar Produto em {category.name}
                 </button>
               </div>
             </div>

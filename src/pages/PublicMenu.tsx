@@ -69,18 +69,123 @@ export default function PublicMenu() {
   
   // Checkout Form State
   const [isCheckout, setIsCheckout] = useState(false);
+  const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('delivery');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [address, setAddress] = useState('');
+  
+  // Address State
+  const [cep, setCep] = useState('');
+  const [street, setStreet] = useState('');
+  const [number, setNumber] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [complement, setComplement] = useState('');
+  
   const [paymentMethod, setPaymentMethod] = useState('pix');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReturningCustomer, setIsReturningCustomer] = useState(false);
 
   // Delivery Fee & Free Shipping Logic
   const deliveryFee = settings?.delivery_fee ?? 5.00;
   const freeShippingThreshold = settings?.free_shipping_threshold ?? 50.00;
   const currentTotal = total();
   const remainingForFreeShipping = freeShippingThreshold ? Math.max(0, freeShippingThreshold - currentTotal) : 0;
-  const finalTotal = currentTotal + (remainingForFreeShipping > 0 || !freeShippingThreshold ? deliveryFee : 0);
+  // If pickup, delivery fee is 0
+  const finalDeliveryFee = deliveryType === 'pickup' ? 0 : (remainingForFreeShipping > 0 || !freeShippingThreshold ? deliveryFee : 0);
+  const finalTotal = currentTotal + finalDeliveryFee;
+
+  const handlePhoneBlur = async () => {
+    if (customerPhone.length < 10 || !profile) return;
+    
+    try {
+      // 1. Try to find in customers table using RPC (bypassing RLS)
+      const { data: customers } = await supabase
+        .rpc('get_customer_by_phone', {
+          p_user_id: profile.id,
+          p_phone: customerPhone
+        });
+
+      const customer = customers && customers.length > 0 ? customers[0] : null;
+
+      if (customer) {
+        setIsReturningCustomer(true);
+        if (!customerName) setCustomerName(customer.name);
+        
+        if (deliveryType === 'delivery') {
+          if (customer.cep) setCep(customer.cep);
+          if (customer.street) setStreet(customer.street);
+          if (customer.number) setNumber(customer.number);
+          if (customer.neighborhood) setNeighborhood(customer.neighborhood);
+          if (customer.city) setCity(customer.city);
+          if (customer.state) setState(customer.state);
+          if (customer.complement) setComplement(customer.complement);
+        }
+        toast.success('Bem-vindo de volta! Seus dados foram preenchidos.');
+        return;
+      }
+
+      // 2. Fallback to orders table (for legacy data)
+      const { data: order } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('customer_phone', customerPhone)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (order) {
+        setIsReturningCustomer(true);
+        if (!customerName) setCustomerName(order.customer_name);
+        
+        // Try to parse address if it exists and we are in delivery mode
+        if (order.address && deliveryType === 'delivery') {
+          const cepMatch = order.address.match(/CEP: ([\d-]+)/);
+          if (cepMatch) setCep(cepMatch[1]);
+          
+          const parts = order.address.split(' - ');
+          if (parts.length >= 3) {
+            const streetAndNum = parts[0].split(',');
+            if (streetAndNum.length >= 2) {
+              setStreet(streetAndNum[0].trim());
+              setNumber(streetAndNum[1].trim());
+            }
+            setNeighborhood(parts[1].trim());
+            
+            const cityState = parts[2].split('/');
+            if (cityState.length >= 2) {
+              setCity(cityState[0].trim());
+              setState(cityState[1].split(' ')[0].trim());
+            }
+          }
+        }
+        toast.success('Bem-vindo de volta! Seus dados foram preenchidos.');
+      }
+    } catch (error) {
+      // Ignore error if not found
+    }
+  };
+
+  const handleCepBlur = async () => {
+    if (cep.length < 8) return;
+    try {
+      const cleanCep = cep.replace(/\D/g, '');
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      
+      if (!data.erro) {
+        setStreet(data.logradouro);
+        setNeighborhood(data.bairro);
+        setCity(data.localidade);
+        setState(data.uf);
+      } else {
+        toast.error('CEP não encontrado');
+      }
+    } catch (error) {
+      toast.error('Erro ao buscar CEP');
+    }
+  };
 
   useEffect(() => {
     if (!isCartOpen) {
@@ -251,13 +356,41 @@ export default function PublicMenu() {
   };
 
   const handleCheckout = async () => {
-    if (!customerName || !address || !customerPhone) {
-      toast.error('Por favor, preencha todos os dados');
+    if (!customerName || !customerPhone) {
+      toast.error('Por favor, preencha nome e telefone');
       return;
+    }
+
+    if (deliveryType === 'delivery' && (!cep || !street || !number || !neighborhood || !city || !state)) {
+      toast.error('Por favor, preencha o endereço completo');
+      return;
+    }
+
+    // Construct address string
+    let finalAddress = '';
+    if (deliveryType === 'delivery') {
+      finalAddress = `${street}, ${number} - ${neighborhood}, ${city}/${state} - CEP: ${cep}${complement ? ` (${complement})` : ''}`;
+    } else {
+      finalAddress = 'Retirada no Local';
     }
 
     setIsSubmitting(true);
     try {
+      // 0. Upsert Customer using RPC (bypassing RLS)
+      await supabase.rpc('upsert_customer', {
+        p_user_id: profile.id,
+        p_name: customerName,
+        p_phone: customerPhone,
+        p_address: finalAddress,
+        p_cep: cep,
+        p_street: street,
+        p_number: number,
+        p_neighborhood: neighborhood,
+        p_city: city,
+        p_state: state,
+        p_complement: complement
+      });
+
       // 1. Create Order
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -265,10 +398,12 @@ export default function PublicMenu() {
           user_id: profile.id,
           customer_name: customerName,
           customer_phone: customerPhone,
-          address: address,
+          address: finalAddress,
           payment_method: paymentMethod,
           total_amount: finalTotal,
-          status: 'pending'
+          status: 'pending',
+          delivery_type: deliveryType // Ensure this column exists or we might need to store it in metadata/notes if not? 
+          // Assuming delivery_type column exists based on Orders.tsx type definition: delivery_type: string;
         })
         .select()
         .single();
@@ -324,12 +459,13 @@ ${items.map(i => {
 }).join('\n')}
 ------------------------------
 Subtotal: ${formatCurrency(currentTotal)}
-Taxa de Entrega: ${(remainingForFreeShipping > 0 || !freeShippingThreshold) ? formatCurrency(deliveryFee) : 'Grátis'}
+Taxa de Entrega: ${deliveryType === 'pickup' ? 'N/A (Retirada)' : (remainingForFreeShipping > 0 || !freeShippingThreshold) ? formatCurrency(deliveryFee) : 'Grátis'}
 *Total: ${formatCurrency(finalTotal)}*
 
 *Cliente:* ${customerName}
 *Tel:* ${customerPhone}
-*Endereço:* ${address}
+*Tipo:* ${deliveryType === 'delivery' ? 'Entrega' : 'Retirada'}
+${deliveryType === 'delivery' ? `*Endereço:* ${finalAddress}` : ''}
 *Pagamento:* ${paymentMethod === 'pix' ? 'Pix' : paymentMethod === 'credit_card' ? 'Cartão de Crédito' : paymentMethod === 'debit_card' ? 'Cartão de Débito' : 'Dinheiro'}
 
 _Acompanhe seu pedido pelo link:_
@@ -372,17 +508,34 @@ ${window.location.origin}/pedido/${order.id}`;
   return (
     <div className="min-h-screen bg-zinc-50 pb-24 font-sans">
       {/* Header */}
-      <header className="bg-white border-b border-zinc-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-zinc-900 truncate">{profile.store_name}</h1>
+      <header className="bg-white border-b border-zinc-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 py-6 flex items-start justify-between">
+          <div className="flex-1 min-w-0 mr-4 space-y-1">
+            <h1 className="text-2xl font-bold text-zinc-900 truncate">
+              {settings?.restaurant_name || profile.store_name}
+            </h1>
+            <div className="text-sm text-zinc-500 space-y-1">
+              <p>
+                Entrega • Mín. {formatCurrency(settings?.min_order_value || 0)}
+              </p>
+              <p className="truncate">
+                {settings ? (
+                  `${settings.address_street}, ${settings.address_number} - ${settings.address_neighborhood}, ${settings.address_city}/${settings.address_state}`
+                ) : (
+                  'Endereço não configurado'
+                )}
+              </p>
+            </div>
+          </div>
+          
           <Button 
             variant="ghost" 
-            className="relative text-purple-600 hover:bg-purple-50"
+            className="relative h-12 w-12 rounded-full bg-purple-50 hover:bg-purple-100 flex items-center justify-center shrink-0 p-0"
             onClick={openCart}
           >
-            <ShoppingCart className="h-6 w-6" />
+            <ShoppingCart className="h-6 w-6 text-purple-600" />
             {items.length > 0 && (
-              <span className="absolute top-1 right-1 h-4 w-4 bg-purple-600 rounded-full text-[10px] font-bold text-white flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-5 w-5 bg-purple-600 rounded-full text-[10px] font-bold text-white flex items-center justify-center border-2 border-white shadow-sm">
                 {items.length}
               </span>
             )}
@@ -585,37 +738,135 @@ ${window.location.origin}/pedido/${order.id}`;
                   {isCheckout ? (
                     /* Checkout Form View */
                     <div className="p-6 space-y-6 bg-white min-h-full">
+                      {/* Delivery Type Toggle */}
+                      <div className="bg-zinc-100 p-1 rounded-xl flex">
+                        <button
+                          onClick={() => setDeliveryType('delivery')}
+                          className={cn(
+                            "flex-1 py-2 text-sm font-bold rounded-lg transition-all",
+                            deliveryType === 'delivery' ? "bg-white text-purple-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                          )}
+                        >
+                          Entrega
+                        </button>
+                        <button
+                          onClick={() => setDeliveryType('pickup')}
+                          className={cn(
+                            "flex-1 py-2 text-sm font-bold rounded-lg transition-all",
+                            deliveryType === 'pickup' ? "bg-white text-purple-600 shadow-sm" : "text-zinc-500 hover:text-zinc-700"
+                          )}
+                        >
+                          Retirada
+                        </button>
+                      </div>
+
                       <div className="space-y-4">
                         <h3 className="font-bold text-zinc-900 flex items-center gap-2 text-lg">
                           <User className="h-5 w-5 text-purple-600" /> Seus Dados
                         </h3>
                         <div className="space-y-3">
-                          <Input 
-                            placeholder="Seu nome completo"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
-                            className="bg-zinc-50 border-zinc-200 h-11"
-                          />
-                          <Input 
-                            placeholder="Seu telefone (WhatsApp)"
-                            value={customerPhone}
-                            onChange={(e) => setCustomerPhone(e.target.value)}
-                            className="bg-zinc-50 border-zinc-200 h-11"
-                          />
+                          <div>
+                            <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Número de Telefone</label>
+                            <Input 
+                              placeholder="(00) 00000-0000"
+                              value={customerPhone}
+                              onChange={(e) => setCustomerPhone(e.target.value)}
+                              onBlur={handlePhoneBlur}
+                              className="bg-zinc-50 border-zinc-200 h-11"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Nome Completo</label>
+                            <Input 
+                              placeholder="Seu nome completo"
+                              value={customerName}
+                              onChange={(e) => setCustomerName(e.target.value)}
+                              className="bg-zinc-50 border-zinc-200 h-11"
+                            />
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                        <h3 className="font-bold text-zinc-900 flex items-center gap-2 text-lg">
-                          <MapPin className="h-5 w-5 text-purple-600" /> Entrega
-                        </h3>
-                        <textarea 
-                          className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm focus:ring-2 focus:ring-purple-500 outline-none resize-none min-h-[100px]"
-                          placeholder="Endereço completo (Rua, Número, Bairro, Complemento, Ponto de Referência)"
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                        />
-                      </div>
+                      {deliveryType === 'delivery' && (
+                        <div className="space-y-4 animate-in slide-in-from-top-2 duration-200">
+                          <h3 className="font-bold text-zinc-900 flex items-center gap-2 text-lg">
+                            <MapPin className="h-5 w-5 text-purple-600" /> Endereço de Entrega
+                          </h3>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">CEP</label>
+                              <Input 
+                                placeholder="00000-000"
+                                value={cep}
+                                onChange={(e) => setCep(e.target.value)}
+                                onBlur={handleCepBlur}
+                                className="bg-zinc-50 border-zinc-200 h-11"
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-[2fr_1fr] gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Endereço</label>
+                                <Input 
+                                  placeholder="Rua..."
+                                  value={street}
+                                  onChange={(e) => setStreet(e.target.value)}
+                                  className="bg-zinc-50 border-zinc-200 h-11"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Número</label>
+                                <Input 
+                                  placeholder="123"
+                                  value={number}
+                                  onChange={(e) => setNumber(e.target.value)}
+                                  className="bg-zinc-50 border-zinc-200 h-11"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Bairro</label>
+                                <Input 
+                                  placeholder="Bairro"
+                                  value={neighborhood}
+                                  onChange={(e) => setNeighborhood(e.target.value)}
+                                  className="bg-zinc-50 border-zinc-200 h-11"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Cidade/UF</label>
+                                <div className="flex gap-2">
+                                  <Input 
+                                    placeholder="Cidade"
+                                    value={city}
+                                    onChange={(e) => setCity(e.target.value)}
+                                    className="bg-zinc-50 border-zinc-200 h-11 flex-1"
+                                  />
+                                  <Input 
+                                    placeholder="UF"
+                                    value={state}
+                                    onChange={(e) => setState(e.target.value)}
+                                    className="bg-zinc-50 border-zinc-200 h-11 w-12 text-center px-0"
+                                    maxLength={2}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <label className="text-xs font-medium text-zinc-500 ml-1 mb-1 block">Complemento (Opcional)</label>
+                              <Input 
+                                placeholder="Apto, Bloco, Ponto de referência..."
+                                value={complement}
+                                onChange={(e) => setComplement(e.target.value)}
+                                className="bg-zinc-50 border-zinc-200 h-11"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="space-y-4">
                         <h3 className="font-bold text-zinc-900 flex items-center gap-2 text-lg">
@@ -718,7 +969,7 @@ ${window.location.origin}/pedido/${order.id}`;
                     </div>
                     <div className="flex justify-between text-sm text-zinc-500">
                       <span>Taxa de Entrega</span>
-                      <span>{(remainingForFreeShipping > 0 || !freeShippingThreshold) ? formatCurrency(deliveryFee) : 'Grátis'}</span>
+                      <span>{deliveryType === 'pickup' ? 'N/A (Retirada)' : (remainingForFreeShipping > 0 || !freeShippingThreshold) ? formatCurrency(deliveryFee) : 'Grátis'}</span>
                     </div>
                     
                     {freeShippingThreshold && (
