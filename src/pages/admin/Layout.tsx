@@ -10,7 +10,8 @@ import {
   Settings, 
   Menu,
   X,
-  LogOut
+  LogOut,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +22,7 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -59,12 +61,19 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-zinc-50 flex font-sans">
       {/* Sidebar Desktop */}
-      <aside className="hidden md:flex w-64 flex-col bg-white border-r border-zinc-100 fixed h-full z-10">
-        <div className="p-6 flex items-center gap-3">
-          <Menu className="h-6 w-6 text-purple-600 cursor-pointer" />
-          <h1 className="text-xl font-bold text-purple-600 tracking-tight">
-            RoxDelivery
-          </h1>
+      <aside className={cn(
+        "hidden md:flex flex-col bg-white border-r border-zinc-100 fixed h-full z-10 transition-all duration-300",
+        isSidebarCollapsed ? "w-20" : "w-64"
+      )}>
+        <div className={cn("p-6 flex items-center gap-3", isSidebarCollapsed && "justify-center px-2")}>
+          <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="hover:bg-zinc-100 p-1 rounded-md transition-colors">
+            <Menu className="h-6 w-6 text-purple-600 cursor-pointer" />
+          </button>
+          {!isSidebarCollapsed && (
+            <h1 className="text-xl font-bold text-purple-600 tracking-tight whitespace-nowrap overflow-hidden">
+              RoxDelivery
+            </h1>
+          )}
         </div>
         
         <nav className="flex-1 px-4 py-2 space-y-1">
@@ -78,11 +87,13 @@ export default function AdminLayout() {
                   "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
                   isActive 
                     ? "bg-purple-50 text-purple-700" 
-                    : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900"
+                    : "text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900",
+                  isSidebarCollapsed && "justify-center px-2"
                 )}
+                title={isSidebarCollapsed ? item.label : undefined}
               >
-                <item.icon className={cn("h-5 w-5", isActive ? "text-purple-600" : "text-zinc-400")} />
-                {item.label}
+                <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-purple-600" : "text-zinc-400")} />
+                {!isSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden">{item.label}</span>}
               </Link>
             );
           })}
@@ -94,18 +105,27 @@ export default function AdminLayout() {
               href={`/menu/${profile.store_slug}`} 
               target="_blank" 
               rel="noreferrer"
-              className="flex items-center gap-2 text-sm text-zinc-500 hover:text-purple-600 px-4 py-2"
+              className={cn(
+                "flex items-center gap-2 text-sm text-zinc-500 hover:text-purple-600 px-4 py-2 transition-colors",
+                isSidebarCollapsed && "justify-center px-0"
+              )}
+              title={isSidebarCollapsed ? "Ver Cardápio Público" : undefined}
             >
-              Ver Cardápio Público &rarr;
+              <ExternalLink className="h-5 w-5 shrink-0" />
+              {!isSidebarCollapsed && <span className="whitespace-nowrap overflow-hidden">Ver Cardápio</span>}
             </a>
           )}
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700 mt-2"
+            className={cn(
+              "w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700 mt-2",
+              isSidebarCollapsed && "justify-center px-0"
+            )}
             onClick={handleSignOut}
+            title={isSidebarCollapsed ? "Sair" : undefined}
           >
-            <LogOut className="h-5 w-5 mr-2" />
-            Sair
+            <LogOut className={cn("h-5 w-5 shrink-0", !isSidebarCollapsed && "mr-2")} />
+            {!isSidebarCollapsed && "Sair"}
           </Button>
         </div>
       </aside>
@@ -151,6 +171,7 @@ export default function AdminLayout() {
                 rel="noreferrer"
                 className="flex items-center gap-2 text-sm text-zinc-500 hover:text-purple-600 px-3 py-3"
               >
+                <ExternalLink className="h-5 w-5" />
                 Ver Cardápio Público &rarr;
               </a>
             )}
@@ -166,7 +187,10 @@ export default function AdminLayout() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64 p-6 md:p-10 pt-20 md:pt-10 overflow-y-auto bg-white">
+      <main className={cn(
+        "flex-1 p-6 md:p-10 pt-20 md:pt-10 overflow-y-auto bg-white transition-all duration-300",
+        isSidebarCollapsed ? "md:ml-20" : "md:ml-64"
+      )}>
         <Outlet context={{ profile }} />
       </main>
     </div>

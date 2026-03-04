@@ -37,6 +37,7 @@ type Addon = {
 
 type Settings = {
   restaurant_name: string;
+  phone?: string;
   delivery_fee: number;
   min_order_value: number;
   free_shipping_threshold: number | null;
@@ -472,7 +473,8 @@ _Acompanhe seu pedido pelo link:_
 ${window.location.origin}/pedido/${order.id}`;
 
       const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${profile.whatsapp_number}?text=${encodedMessage}`;
+      const targetPhone = settings?.phone || profile.whatsapp_number;
+      const whatsappUrl = `https://wa.me/${targetPhone?.replace(/\D/g, '')}?text=${encodedMessage}`;
       
       window.open(whatsappUrl, '_blank');
       
@@ -698,6 +700,19 @@ ${window.location.origin}/pedido/${order.id}`;
             </div>
           </div>
         </div>
+      )}
+
+      {/* WhatsApp Floating Button */}
+      {(settings?.phone || profile?.whatsapp_number) && (
+        <a
+          href={`https://wa.me/${(settings?.phone || profile?.whatsapp_number)?.replace(/\D/g, '')}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-6 right-6 z-40 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-lg transition-transform hover:scale-110 flex items-center justify-center"
+          aria-label="Contato via WhatsApp"
+        >
+          <MessageCircle className="h-8 w-8" />
+        </a>
       )}
 
       {/* Cart Drawer */}

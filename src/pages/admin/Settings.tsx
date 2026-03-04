@@ -24,6 +24,7 @@ const timeSlotSchema = z.object({
 
 const settingsSchema = z.object({
   restaurant_name: z.string().min(1, 'Nome do restaurante é obrigatório'),
+  phone: z.string().min(10, 'Telefone inválido').optional().or(z.literal('')),
   delivery_fee: z.coerce.number().min(0, 'Taxa de entrega deve ser positiva'),
   min_order_value: z.coerce.number().min(0, 'Pedido mínimo deve ser positivo'),
   free_shipping_threshold: z.coerce.number().nullable().optional(),
@@ -56,6 +57,7 @@ export default function Settings() {
     resolver: zodResolver(settingsSchema) as any,
     defaultValues: {
       restaurant_name: '',
+      phone: '',
       delivery_fee: 0,
       min_order_value: 0,
       free_shipping_threshold: null,
@@ -100,6 +102,7 @@ export default function Settings() {
 
         if (data) {
           setValue('restaurant_name', data.restaurant_name);
+          setValue('phone', data.phone || '');
           setValue('delivery_fee', data.delivery_fee);
           setValue('min_order_value', data.min_order_value);
           setValue('free_shipping_threshold', data.free_shipping_threshold);
@@ -122,6 +125,23 @@ export default function Settings() {
 
     loadSettings();
   }, [user, setValue]);
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 11) value = value.slice(0, 11);
+    
+    if (value.length > 10) {
+      value = value.replace(/^(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+    } else if (value.length > 6) {
+      value = value.replace(/^(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+    } else if (value.length > 2) {
+      value = value.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
+    } else {
+      value = value.replace(/^(\d*)/, '($1');
+    }
+    
+    setValue('phone', value);
+  };
 
   const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
     const cep = e.target.value.replace(/\D/g, '');
@@ -225,10 +245,25 @@ export default function Settings() {
               </label>
               <input
                 {...register('restaurant_name')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.restaurant_name && (
                 <p className="text-red-500 text-sm mt-1">{errors.restaurant_name.message}</p>
+              )}
+            </div>
+
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Telefone / WhatsApp
+              </label>
+              <input
+                {...register('phone')}
+                onChange={handlePhoneChange}
+                placeholder="(00) 00000-0000"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              />
+              {errors.phone && (
+                <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>
               )}
             </div>
 
@@ -240,7 +275,7 @@ export default function Settings() {
                 type="number"
                 step="0.01"
                 {...register('delivery_fee')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.delivery_fee && (
                 <p className="text-red-500 text-sm mt-1">{errors.delivery_fee.message}</p>
@@ -255,7 +290,7 @@ export default function Settings() {
                 type="number"
                 step="0.01"
                 {...register('min_order_value')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.min_order_value && (
                 <p className="text-red-500 text-sm mt-1">{errors.min_order_value.message}</p>
@@ -270,7 +305,7 @@ export default function Settings() {
                 type="number"
                 step="0.01"
                 {...register('free_shipping_threshold')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
             </div>
           </div>
@@ -285,7 +320,7 @@ export default function Settings() {
               <input
                 {...register('address_cep')}
                 onBlur={handleCepBlur}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                 placeholder="00000-000"
               />
               {errors.address_cep && (
@@ -297,7 +332,7 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Rua</label>
               <input
                 {...register('address_street')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.address_street && (
                 <p className="text-red-500 text-sm mt-1">{errors.address_street.message}</p>
@@ -308,7 +343,7 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Número</label>
               <input
                 {...register('address_number')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.address_number && (
                 <p className="text-red-500 text-sm mt-1">{errors.address_number.message}</p>
@@ -319,7 +354,7 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
               <input
                 {...register('address_neighborhood')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.address_neighborhood && (
                 <p className="text-red-500 text-sm mt-1">{errors.address_neighborhood.message}</p>
@@ -330,7 +365,7 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
               <input
                 {...register('address_city')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.address_city && (
                 <p className="text-red-500 text-sm mt-1">{errors.address_city.message}</p>
@@ -341,7 +376,7 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
               <input
                 {...register('address_state')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
               {errors.address_state && (
                 <p className="text-red-500 text-sm mt-1">{errors.address_state.message}</p>
@@ -352,7 +387,7 @@ export default function Settings() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
               <input
                 {...register('address_complement')}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
               />
             </div>
           </div>
@@ -427,13 +462,13 @@ export default function Settings() {
                       <input
                         type="time"
                         {...register(`opening_hours.${key}.${index}.open`)}
-                        className="px-2 py-1 border rounded text-sm"
+                        className="px-2 py-1 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                       />
                       <span className="text-gray-500">até</span>
                       <input
                         type="time"
                         {...register(`opening_hours.${key}.${index}.close`)}
-                        className="px-2 py-1 border rounded text-sm"
+                        className="px-2 py-1 border border-gray-200 rounded text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                       />
                       <button
                         type="button"

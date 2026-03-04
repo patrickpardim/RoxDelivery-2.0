@@ -171,7 +171,7 @@ export default function Dashboard() {
             variant={period === 'today' ? 'default' : 'ghost'} 
             size="sm" 
             onClick={() => setPeriod('today')}
-            className={period === 'today' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={period === 'today' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}
           >
             Hoje
           </Button>
@@ -179,7 +179,7 @@ export default function Dashboard() {
             variant={period === 'yesterday' ? 'default' : 'ghost'} 
             size="sm" 
             onClick={() => setPeriod('yesterday')}
-            className={period === 'yesterday' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={period === 'yesterday' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}
           >
             Ontem
           </Button>
@@ -187,7 +187,7 @@ export default function Dashboard() {
             variant={period === 'week' ? 'default' : 'ghost'} 
             size="sm" 
             onClick={() => setPeriod('week')}
-            className={period === 'week' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={period === 'week' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}
           >
             Semana
           </Button>
@@ -195,7 +195,7 @@ export default function Dashboard() {
             variant={period === 'month' ? 'default' : 'ghost'} 
             size="sm" 
             onClick={() => setPeriod('month')}
-            className={period === 'month' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+            className={period === 'month' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}
           >
             Mês
           </Button>
